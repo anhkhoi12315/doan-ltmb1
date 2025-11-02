@@ -1,4 +1,4 @@
-// lib/weather_provider.dart
+
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'weather_model.dart';

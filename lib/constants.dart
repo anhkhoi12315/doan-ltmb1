@@ -1,4 +1,4 @@
-// lib/constants.dart
+
 
 /// App constants và configuration
 const String APP_NAME = 'Weather App';

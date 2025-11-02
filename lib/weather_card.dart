@@ -1,4 +1,4 @@
-// lib/weather_card.dart - WITH FEELS LIKE DESCRIPTION
+
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
