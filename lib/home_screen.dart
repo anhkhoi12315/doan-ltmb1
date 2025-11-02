@@ -15,7 +15,6 @@ import 'weather_card.dart';
 import 'notification_service.dart';
 import 'constants.dart';
 
-/// Home Screen với Riverpod
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
@@ -214,7 +213,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       ),
                     ),
                     Text(
-                      'with Riverpod',
+                      'with KHOI',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -360,7 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             Text('Weather App v1.0.0'),
             SizedBox(height: 8),
-            Text('Ứng dụng xem thời tiết với Riverpod'),
+            Text('Ứng dụng xem thời tiết NGUYENKHOI'),
             SizedBox(height: 8),
             Text('Powered by OpenWeatherMap API'),
           ],
