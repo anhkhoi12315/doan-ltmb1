@@ -23,7 +23,7 @@ class _SearchScreenState extends State<SearchScreen> {
     {
       'name': 'Hanoi',
       'country': 'Vietnam',
-      'image': 'https://images.unsplash.com/photo-1509023464722-18d996393ca8?w=400&q=80',
+      'image': 'https://th.bing.com/th/id/OIP.s2SHIZUjABr-gwswyqZhkAHaE7?w=280&h=180&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
     },
     {
       'name': 'Da Nang',
@@ -33,17 +33,17 @@ class _SearchScreenState extends State<SearchScreen> {
     {
       'name': 'Nha Trang',
       'country': 'Vietnam',
-      'image': 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&q=80',
+      'image': 'https://th.bing.com/th/id/OIP.C58yDx5WNesGfG77G5En6QHaE8?w=286&h=180&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
     },
     {
       'name': 'Can Tho',
       'country': 'Vietnam',
-      'image': 'https://images.unsplash.com/photo-1528127269322-539801943592?w=400&q=80',
+      'image': 'https://th.bing.com/th/id/OIP.dNsi4UG6KrW0z8213TKFVgHaDL?w=361&h=150&c=7&r=0&o=7&dpr=1.3&pid=1.7&rm=3',
     },
     {
       'name': 'Hue',
       'country': 'Vietnam',
-      'image': 'https://images.unsplash.com/photo-1555618254-84c5d8d44d34?w=400&q=80',
+      'image': 'https://bcp.cdnchinhphu.vn/334894974524682240/2024/5/14/image-16741752013341806036984-1715674003619855448719.png',
     },
     {
       'name': 'Tokyo',
@@ -68,12 +68,12 @@ class _SearchScreenState extends State<SearchScreen> {
     {
       'name': 'Seoul',
       'country': 'South Korea',
-      'image': 'https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=400&q=80',
+      'image': 'https://wallpaperaccess.com/full/196436.jpg',
     },
     {
       'name': 'Bangkok',
       'country': 'Thailand',
-      'image': 'https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=400&q=80',
+      'image': 'https://owa.bestprice.vn/images/destinations/uploads/bangkok-543c92d75fddd.jpg',
     },
   ];
 
