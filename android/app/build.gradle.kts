@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.app_weather"
-    compileSdk = 34
+    compileSdk = 36
     ndkVersion = "26.1.10909125"
 
     compileOptions {
@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.example.app_weather"
         minSdk = flutter.minSdkVersion
-        targetSdk = 34
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 

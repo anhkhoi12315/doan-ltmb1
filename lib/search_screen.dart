@@ -1,3 +1,5 @@
+// lib/search_screen.dart
+
 import 'package:flutter/material.dart';
 import 'dart:ui';
 
@@ -11,7 +13,7 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  // Danh sách thành phố với ảnh - UPDATED URLs
+  // Danh sách thành phố với ảnh
   final List<Map<String, String>> _popularCities = [
     {
       'name': 'Ho Chi Minh',
@@ -21,27 +23,27 @@ class _SearchScreenState extends State<SearchScreen> {
     {
       'name': 'Hanoi',
       'country': 'Vietnam',
-      'image': 'https://hoanghamobile.com/tin-tuc/wp-content/uploads/2024/04/anh-ha-noi.jpg',
+      'image': 'https://images.unsplash.com/photo-1509023464722-18d996393ca8?w=400&q=80',
     },
     {
       'name': 'Da Nang',
       'country': 'Vietnam',
-      'image': 'https://cdn-media.sforum.vn/storage/app/media/ctvseo_MH/%E1%BA%A3nh%20%C4%91%E1%BA%B9p%20%C4%91%C3%A0%20n%E1%BA%B5ng/anh-dep-da-nang-thumb.jpg',
+      'image': 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=400&q=80',
     },
     {
       'name': 'Nha Trang',
       'country': 'Vietnam',
-      'image': 'https://xaviahotel.com/vnt_upload/news/11_2017/nha-trang_1.jpg',
+      'image': 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&q=80',
     },
     {
       'name': 'Can Tho',
       'country': 'Vietnam',
-      'image': 'https://ezcloud.vn/wp-content/uploads/2023/07/dia-diem-check-in-can-tho.webp',
+      'image': 'https://images.unsplash.com/photo-1528127269322-539801943592?w=400&q=80',
     },
     {
       'name': 'Hue',
       'country': 'Vietnam',
-      'image': 'https://cdn-media.sforum.vn/storage/app/media/ctvseo_MH/%E1%BA%A3nh%20%C4%91%E1%BA%B9p%20Hu%E1%BA%BF/anh-dep-hue-1.jpg',
+      'image': 'https://images.unsplash.com/photo-1555618254-84c5d8d44d34?w=400&q=80',
     },
     {
       'name': 'Tokyo',
@@ -84,10 +86,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _selectCity(String cityName) {
-    // Debug print
     print('🌍 Selected city: $cityName');
-
-    // Navigate back với city name
     Navigator.pop(context, cityName);
   }
 
@@ -128,10 +127,7 @@ class _SearchScreenState extends State<SearchScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () {
-              print('🔙 Back button pressed');
-              Navigator.pop(context);
-            },
+            onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 8),
           const Text(
@@ -156,10 +152,10 @@ class _SearchScreenState extends State<SearchScreen> {
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(15),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
+                color: Colors.white.withOpacity(0.3),
                 width: 1.5,
               ),
             ),
@@ -168,7 +164,7 @@ class _SearchScreenState extends State<SearchScreen> {
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
                 hintText: 'Tìm kiếm thành phố...',
-                hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.6)),
                 prefixIcon: const Icon(Icons.search, color: Colors.white),
                 suffixIcon: _searchController.text.isNotEmpty
                     ? IconButton(
@@ -188,7 +184,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               onSubmitted: (value) {
                 if (value.isNotEmpty) {
-                  print('🔍 Search submitted: $value');
                   _selectCity(value);
                 }
               },
@@ -224,10 +219,7 @@ class _SearchScreenState extends State<SearchScreen> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: () {
-          print('👆 Card tapped: ${city['name']}');
-          _selectCity(city['name']!);
-        },
+        onTap: () => _selectCity(city['name']!),
         borderRadius: BorderRadius.circular(20),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
@@ -237,28 +229,26 @@ class _SearchScreenState extends State<SearchScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.blue.withValues(alpha: 0.3),
-                  Colors.purple.withValues(alpha: 0.3),
+                  Colors.blue.withOpacity(0.3),
+                  Colors.purple.withOpacity(0.3),
                 ],
               ),
             ),
             child: Stack(
               fit: StackFit.expand,
               children: [
-                // Background image
                 Image.network(
                   city['image']!,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
-                    print('❌ Image error for ${city['name']}: $error');
                     return Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Colors.blue.withValues(alpha: 0.5),
-                            Colors.purple.withValues(alpha: 0.5),
+                            Colors.blue.withOpacity(0.5),
+                            Colors.purple.withOpacity(0.5),
                           ],
                         ),
                       ),
@@ -277,8 +267,8 @@ class _SearchScreenState extends State<SearchScreen> {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            Colors.blue.withValues(alpha: 0.3),
-                            Colors.purple.withValues(alpha: 0.3),
+                            Colors.blue.withOpacity(0.3),
+                            Colors.purple.withOpacity(0.3),
                           ],
                         ),
                       ),
@@ -291,7 +281,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     );
                   },
                 ),
-                // Gradient overlay
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -299,12 +288,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       end: Alignment.bottomCenter,
                       colors: [
                         Colors.transparent,
-                        Colors.black.withValues(alpha: 0.7),
+                        Colors.black.withOpacity(0.7),
                       ],
                     ),
                   ),
                 ),
-                // City info
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: Column(
@@ -325,7 +313,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       Text(
                         city['country']!,
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.8),
+                          color: Colors.white.withOpacity(0.8),
                           fontSize: 12,
                         ),
                         maxLines: 1,
@@ -334,14 +322,13 @@ class _SearchScreenState extends State<SearchScreen> {
                     ],
                   ),
                 ),
-                // Arrow icon
                 Positioned(
                   top: 12,
                   right: 12,
                   child: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.3),
+                      color: Colors.white.withOpacity(0.3),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(

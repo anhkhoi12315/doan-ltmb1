@@ -1,46 +1,44 @@
+// lib/home_screen.dart
+
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:ui';
-import 'weather_service.dart';
 import 'weather_model.dart';
+import 'weather_provider.dart';
+import 'settings_provider.dart';
+import 'favorites_provider.dart';
 import 'forecast_screen.dart';
 import 'search_screen.dart';
+import 'favorites_screen.dart';
+import 'settings_screen.dart';
+import 'weather_card.dart';
 import 'notification_service.dart';
+import 'constants.dart';
 
-class HomeScreen extends StatefulWidget {
-  final String? cityName;
-
-  const HomeScreen({Key? key, this.cityName}) : super(key: key);
+/// Home Screen với Riverpod
+class HomeScreen extends ConsumerStatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-  final WeatherService _weatherService = WeatherService();
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
+
   final NotificationService _notificationService = NotificationService();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  Weather? _weather;
-  bool _isLoading = true;
-  bool _isRefreshing = false;
-  String _errorMessage = '';
-  late String _currentCity;
-  DateTime? _lastUpdateTime;
   late AnimationController _rotationController;
-
-  // Settings
-  String _temperatureUnit = '°C';
-  bool _notificationsEnabled = true;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _currentCity = widget.cityName ?? 'Ho Chi Minh';
     _rotationController = AnimationController(
-      duration: Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
     _initializeNotifications();
-    _fetchWeather();
   }
 
   Future<void> _initializeNotifications() async {
@@ -54,102 +52,28 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  Future<void> _fetchWeather() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
-
-    try {
-      final weatherData = await _weatherService.getCurrentWeather(_currentCity);
-      setState(() {
-        _weather = Weather.fromJson(weatherData);
-        _isLoading = false;
-        _lastUpdateTime = DateTime.now();
-      });
-
-      if (_notificationsEnabled && _weather != null) {
-        _sendWeatherNotifications();
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _sendWeatherNotifications() async {
-    if (_weather == null) return;
-
-    await _notificationService.showWeatherNotification(
-      cityName: _weather!.cityName,
-      temperature: _weather!.temperature,
-      description: _weather!.description,
-      icon: _weather!.icon,
-    );
-
-    if (_weather!.temperature > 35) {
-      await _notificationService.showTemperatureAlert(
-        cityName: _weather!.cityName,
-        temperature: _weather!.temperature,
-        type: 'hot',
-      );
-    }
-
-    if (_weather!.temperature < 15) {
-      await _notificationService.showTemperatureAlert(
-        cityName: _weather!.cityName,
-        temperature: _weather!.temperature,
-        type: 'cold',
-      );
-    }
-
-    final description = _weather!.description.toLowerCase();
-    if (description.contains('mưa') || description.contains('rain')) {
-      await _notificationService.showRainAlert(
-        cityName: _weather!.cityName,
-        description: _weather!.description,
-      );
-    }
-
-    if (description.contains('bão') || description.contains('storm') ||
-        description.contains('giông') || description.contains('thunder')) {
-      await _notificationService.showWeatherAlert(
-        cityName: _weather!.cityName,
-        alertMessage: 'Cảnh báo: ${_weather!.description}. Hãy cẩn thận!',
-        severity: 'danger',
-      );
-    }
-  }
-
   Future<void> _refreshWeather() async {
     if (_isRefreshing) return;
 
-    setState(() {
-      _isRefreshing = true;
-    });
-
+    setState(() => _isRefreshing = true);
     _rotationController.repeat();
 
     try {
-      final weatherData = await _weatherService.getCurrentWeather(_currentCity);
-      setState(() {
-        _weather = Weather.fromJson(weatherData);
-        _lastUpdateTime = DateTime.now();
-      });
+      // Force refresh bằng cách invalidate provider
+      ref.invalidate(currentWeatherProvider);
+      await ref.read(currentWeatherProvider.future);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: const Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.white, size: 20),
                 SizedBox(width: 12),
                 Text('Đã cập nhật thành công!'),
               ],
             ),
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.green.withOpacity(0.9),
             shape: RoundedRectangleBorder(
@@ -162,14 +86,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: const Row(
               children: [
                 Icon(Icons.error_outline, color: Colors.white, size: 20),
                 SizedBox(width: 12),
                 Text('Không thể cập nhật'),
               ],
             ),
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Colors.red.withOpacity(0.9),
             shape: RoundedRectangleBorder(
@@ -181,53 +105,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     } finally {
       _rotationController.stop();
       _rotationController.reset();
-
-      setState(() {
-        _isRefreshing = false;
-      });
+      setState(() => _isRefreshing = false);
     }
   }
 
-  Color _getGradientColor() {
-    if (_weather == null) {
-      return Color(0xFF4A90E2);
-    }
+  Color _getGradientColor(Weather? weather) {
+    if (weather == null) return const Color(0xFF4A90E2);
 
     final hour = DateTime.now().hour;
-    final weatherMain = _weather!.description.toLowerCase();
+    final weatherMain = weather.description.toLowerCase();
 
     if (hour >= 18 || hour < 6) {
-      return Color(0xFF1a237e);
+      return const Color(0xFF1a237e);
     }
 
     if (weatherMain.contains('mưa') || weatherMain.contains('rain')) {
-      return Color(0xFF546e7a);
+      return const Color(0xFF546e7a);
     }
 
     if (weatherMain.contains('mây') || weatherMain.contains('cloud')) {
-      return Color(0xFF607d8b);
+      return const Color(0xFF607d8b);
     }
 
-    return Color(0xFF4A90E2);
-  }
-
-  String _formatLastUpdate() {
-    if (_lastUpdateTime == null) return 'Chưa có dữ liệu';
-
-    final now = DateTime.now();
-    final diff = now.difference(_lastUpdateTime!);
-
-    if (diff.inSeconds < 60) {
-      return 'Cập nhật ${diff.inSeconds}s trước';
-    } else if (diff.inMinutes < 60) {
-      return 'Cập nhật ${diff.inMinutes}m trước';
-    } else {
-      return 'Cập nhật ${diff.inHours}h trước';
-    }
+    return const Color(0xFF4A90E2);
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    final weatherAsync = ref.watch(currentWeatherProvider);
+    final currentCity = ref.watch(selectedCityProvider);
+    final temperatureUnit = ref.watch(temperatureUnitProvider);
+
     return Scaffold(
       key: _scaffoldKey,
       drawer: _buildDrawer(),
@@ -237,27 +146,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              _getGradientColor(),
-              _getGradientColor().withBlue((_getGradientColor().blue + 50).clamp(0, 255)),
-              Color(0xFF9B59B6),
+              _getGradientColor(weatherAsync.value),
+              _getGradientColor(weatherAsync.value)
+                  .withBlue((_getGradientColor(weatherAsync.value).blue + 50).clamp(0, 255)),
+              const Color(0xFF9B59B6),
             ],
           ),
         ),
         child: SafeArea(
-          child: _isLoading && _weather == null
-              ? Center(child: CircularProgressIndicator(color: Colors.white))
-              : _errorMessage.isNotEmpty && _weather == null
-              ? _buildErrorWidget()
-              : _buildWeatherContent(),
+          child: weatherAsync.when(
+            data: (weather) {
+              // ← FIX: Watch isFavorite INSIDE data callback
+              final isFavorite = ref.watch(isFavoriteCityProvider(weather.cityName));
+              return _buildWeatherContent(weather, temperatureUnit, isFavorite);
+            },
+            loading: () => const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+            error: (error, stack) => _buildErrorWidget(error.toString()),
+          ),
         ),
       ),
     );
   }
 
+
   Widget _buildDrawer() {
+    final temperatureUnit = ref.watch(temperatureUnitProvider);
+    final notificationsEnabled = ref.watch(notificationsProvider);
+    final favoritesCount = ref.watch(favoritesCountProvider);
+
     return Drawer(
       child: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -271,12 +192,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           child: Column(
             children: [
               Container(
-                padding: EdgeInsets.all(24),
-                child: Column(
+                padding: const EdgeInsets.all(24),
+                child: const Column(
                   children: [
                     CircleAvatar(
                       radius: 40,
-                      backgroundColor: Colors.white.withOpacity(0.3),
+                      backgroundColor: Colors.white30,
                       child: Icon(
                         Icons.wb_sunny,
                         size: 40,
@@ -293,7 +214,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
                     Text(
-                      'by Nguyễn Khôi',
+                      'with Riverpod',
                       style: TextStyle(
                         color: Colors.white70,
                         fontSize: 14,
@@ -302,18 +223,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ],
                 ),
               ),
-              Divider(color: Colors.white30),
-
+              const Divider(color: Colors.white30),
               Expanded(
                 child: ListView(
-                  padding: EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
                   children: [
                     _buildDrawerItem(
                       icon: Icons.home,
                       title: 'Trang chủ',
-                      onTap: () {
-                        Navigator.pop(context);
-                      },
+                      onTap: () => Navigator.pop(context),
                     ),
                     _buildDrawerItem(
                       icon: Icons.search,
@@ -322,119 +240,62 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         Navigator.pop(context);
                         final selectedCity = await Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => SearchScreen()),
+                          MaterialPageRoute(builder: (_) => const SearchScreen()),
                         );
-
                         if (selectedCity != null && selectedCity is String) {
-                          print('🏠 Drawer received: $selectedCity');
-                          setState(() {
-                            _currentCity = selectedCity;
-                            _isLoading = true;
-                          });
-                          _fetchWeather();
-                        }
-                      },
-                    ),
-                    _buildDrawerItem(
-                      icon: Icons.calendar_today,
-                      title: 'Dự báo 7 ngày',
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (_weather != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ForecastScreen(
-                                cityName: _weather!.cityName,
-                              ),
-                            ),
-                          );
+                          ref.read(selectedCityProvider.notifier).state = selectedCity;
                         }
                       },
                     ),
                     _buildDrawerItem(
                       icon: Icons.favorite,
                       title: 'Yêu thích',
-                      subtitle: 'Đang phát triển',
+                      subtitle: '$favoritesCount thành phố',
                       onTap: () {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Tính năng đang được phát triển!'),
-                            backgroundColor: Colors.orange,
-                          ),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const FavoritesScreen()),
                         );
                       },
                     ),
-                    Divider(color: Colors.white30),
+                    const Divider(color: Colors.white30),
+                    _buildDrawerItem(
+                      icon: Icons.settings,
+                      title: 'Cài đặt',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                        );
+                      },
+                    ),
                     _buildDrawerItem(
                       icon: Icons.thermostat,
                       title: 'Đơn vị nhiệt độ',
-                      subtitle: _temperatureUnit,
+                      subtitle: temperatureUnit,
                       trailing: Switch(
-                        value: _temperatureUnit == '°C',
+                        value: temperatureUnit == '°C',
                         activeColor: Colors.white,
                         onChanged: (value) {
-                          setState(() {
-                            _temperatureUnit = value ? '°C' : '°F';
-                          });
-                          Navigator.pop(context);
+                          ref.read(temperatureUnitProvider.notifier).toggle();
                         },
                       ),
                     ),
                     _buildDrawerItem(
                       icon: Icons.notifications,
                       title: 'Thông báo',
-                      subtitle: _notificationsEnabled ? 'Bật' : 'Tắt',
+                      subtitle: notificationsEnabled ? 'Bật' : 'Tắt',
                       trailing: Switch(
-                        value: _notificationsEnabled,
+                        value: notificationsEnabled,
                         activeColor: Colors.white,
                         onChanged: (value) {
-                          setState(() {
-                            _notificationsEnabled = value;
-                          });
-
-                          if (value) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('✅ Đã bật thông báo thời tiết'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                            if (_weather != null) {
-                              _notificationService.showWeatherNotification(
-                                cityName: _weather!.cityName,
-                                temperature: _weather!.temperature,
-                                description: _weather!.description,
-                                icon: _weather!.icon,
-                              );
-                            }
-                          } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('❌ Đã tắt thông báo thời tiết'),
-                                backgroundColor: Colors.orange,
-                              ),
-                            );
-                            _notificationService.cancelAll();
-                          }
+                          ref.read(notificationsProvider.notifier).toggle();
                         },
                       ),
                     ),
-                    _buildDrawerItem(
-                      icon: Icons.dark_mode,
-                      title: 'Chế độ tối',
-                      subtitle: 'Đang phát triển',
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Tính năng đang được phát triển!'),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
-                      },
-                    ),
-                    Divider(color: Colors.white30),
+                    const Divider(color: Colors.white30),
                     _buildDrawerItem(
                       icon: Icons.info,
                       title: 'Giới thiệu',
@@ -443,24 +304,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         _showAboutDialog();
                       },
                     ),
-                    _buildDrawerItem(
-                      icon: Icons.help,
-                      title: 'Trợ giúp',
-                      onTap: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Liên hệ: support@weatherapp.com'),
-                            backgroundColor: Colors.blue,
-                          ),
-                        );
-                      },
-                    ),
                   ],
                 ),
               ),
-
-              Padding(
+              const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text(
                   'Version 1.0.0',
@@ -488,19 +335,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       leading: Icon(icon, color: Colors.white),
       title: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           color: Colors.white,
           fontSize: 16,
           fontWeight: FontWeight.w500,
         ),
       ),
       subtitle: subtitle != null
-          ? Text(
-        subtitle,
-        style: TextStyle(color: Colors.white60, fontSize: 12),
-      )
+          ? Text(subtitle, style: const TextStyle(color: Colors.white60, fontSize: 12))
           : null,
-      trailing: trailing ?? Icon(Icons.chevron_right, color: Colors.white60),
+      trailing: trailing ?? const Icon(Icons.chevron_right, color: Colors.white60),
       onTap: onTap,
     );
   }
@@ -509,16 +353,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Giới thiệu'),
-        content: Column(
+        title: const Text('Giới thiệu'),
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Weather App v1.0.0'),
             SizedBox(height: 8),
-            Text('Ứng dụng xem thời tiết'),
-            SizedBox(height: 8),
-            Text('Phát triển bởi: Your Name'),
+            Text('Ứng dụng xem thời tiết với Riverpod'),
             SizedBox(height: 8),
             Text('Powered by OpenWeatherMap API'),
           ],
@@ -526,291 +368,259 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Đóng'),
+            child: const Text('Đóng'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildErrorWidget() {
+  Widget _buildErrorWidget(String error) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.white70),
-          SizedBox(height: 16),
-          Text(
+          const Icon(Icons.error_outline, size: 64, color: Colors.white70),
+          const SizedBox(height: 16),
+          const Text(
             'Không thể tải dữ liệu',
             style: TextStyle(color: Colors.white, fontSize: 18),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Text(
-              _errorMessage,
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              error,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _fetchWeather,
+            onPressed: () => ref.invalidate(currentWeatherProvider),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white.withOpacity(0.2),
-              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
             ),
-            child: Text('Thử lại', style: TextStyle(color: Colors.white)),
+            child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWeatherContent() {
-    if (_weather == null) return SizedBox();
-
+  Widget _buildWeatherContent(Weather weather, String temperatureUnit, bool isFavorite) {
     return RefreshIndicator(
       onRefresh: _refreshWeather,
       color: Colors.blue,
       child: SingleChildScrollView(
-        physics: AlwaysScrollableScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            children: [
-              _buildHeader(),
-              SizedBox(height: 30),
-              _buildMainWeather(),
-              SizedBox(height: 30),
-              _buildWeatherDetails(),
-              SizedBox(height: 20),
-              _buildForecastButton(),
-              SizedBox(height: 12),
-              _buildRefreshInfo(),
-            ],
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height -
+                MediaQuery.of(context).padding.top -
+                MediaQuery.of(context).padding.bottom,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeader(weather, isFavorite),
+                const SizedBox(height: 20),
+                WeatherCard(
+                  weather: weather,
+                  temperatureUnit: temperatureUnit,
+                ),
+                const SizedBox(height: 16),
+                _buildForecastButton(weather),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+
+  Widget _buildHeader(Weather weather, bool isFavorite) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        // Menu button
         GestureDetector(
-          onTap: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
+          onTap: () => _scaffoldKey.currentState?.openDrawer(),
           child: Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(Icons.menu, color: Colors.white, size: 24),
+            child: const Icon(Icons.menu, color: Colors.white, size: 24),
           ),
         ),
-        GestureDetector(
-          onTap: () async {
-            // ← FIX: Nhận city name từ search screen
-            final selectedCity = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => SearchScreen()),
-            );
 
-            if (selectedCity != null && selectedCity is String) {
-              print('🏠 Header received city: $selectedCity');
-              setState(() {
-                _currentCity = selectedCity;
-                _isLoading = true;
-              });
-              _fetchWeather();
-            }
-          },
-          child: Row(
-            children: [
-              Icon(Icons.location_on, color: Colors.white, size: 20),
-              SizedBox(width: 8),
-              Text(
-                _weather!.cityName,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(width: 4),
-              Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
-            ],
-          ),
-        ),
-        GestureDetector(
-          onTap: _isRefreshing ? null : _refreshWeather,
-          child: Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: _isRefreshing
-                  ? Colors.white.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: RotationTransition(
-              turns: _rotationController,
-              child: Icon(
-                Icons.refresh,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMainWeather() {
-    return Column(
-      children: [
-        Container(
-          width: 120,
-          height: 120,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Image.network(
-            _weatherService.getWeatherIconUrl(_weather!.icon),
-            fit: BoxFit.contain,
-          ),
-        ),
-        SizedBox(height: 20),
-        Text(
-          '${_weather!.temperature.round()}°',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 72,
-            fontWeight: FontWeight.bold,
-            height: 1,
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          _weather!.description,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        SizedBox(height: 4),
-        Text(
-          'Cảm giác như ${_weather!.feelsLike.round()}°',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 14,
-          ),
-        ),
-        SizedBox(height: 6),
-        Text(
-          _formatDate(_weather!.dateTime),
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 14,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildWeatherDetails() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.4,
-      children: [
-        _buildDetailCard(
-          icon: Icons.air,
-          label: 'Tốc độ gió',
-          value: '${_weather!.windSpeed.toStringAsFixed(1)} km/h',
-        ),
-        _buildDetailCard(
-          icon: Icons.water_drop,
-          label: 'Độ ẩm',
-          value: '${_weather!.humidity}%',
-        ),
-        _buildDetailCard(
-          icon: Icons.visibility,
-          label: 'Tầm nhìn',
-          value: '${(_weather!.visibility / 1000).toStringAsFixed(1)} km',
-        ),
-        _buildDetailCard(
-          icon: Icons.compress,
-          label: 'Áp suất',
-          value: '${_weather!.pressure} hPa',
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDetailCard({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.3),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: Colors.white, size: 18),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 12,
-                      ),
+        // City selector
+        Expanded(
+          child: GestureDetector(
+            onTap: () async {
+              final selectedCity = await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SearchScreen()),
+              );
+              if (selectedCity != null && selectedCity is String) {
+                ref.read(selectedCityProvider.notifier).state = selectedCity;
+              }
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.location_on, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    weather.cityName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-              Text(
-                value,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
                 ),
-              ),
-            ],
+                const SizedBox(width: 4),
+                const Icon(Icons.keyboard_arrow_down, color: Colors.white, size: 20),
+              ],
+            ),
           ),
         ),
-      ),
+
+        // Right buttons: Test Notification + Favorite + Refresh
+        Row(
+          children: [
+            // TEST NOTIFICATION BUTTON (NEW!)
+            // TEST NOTIFICATION BUTTON with debug
+            GestureDetector(
+              onTap: () async {
+                print('🔔 Testing notification...');
+
+                try {
+                  // Request permission first
+                  await _notificationService.requestPermissions();
+
+                  // Show notification
+                  await _notificationService.showWeatherNotification(
+                    cityName: weather.cityName,
+                    temperature: weather.temperature,
+                    description: weather.description,
+                    icon: weather.icon,
+                  );
+
+                  print('✅ Notification sent successfully!');
+
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.white),
+                            SizedBox(width: 12),
+                            Text('Đã gửi thông báo! Kiểm tra notification drawer'),
+                          ],
+                        ),
+                        duration: Duration(seconds: 3),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print('❌ Notification error: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Lỗi: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.notifications_active,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+
+            // Favorite button
+            GestureDetector(
+              onTap: () async {
+                await ref.read(favoritesProvider.notifier).toggleFavorite(weather.cityName);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isFavorite
+                            ? 'Đã xóa khỏi yêu thích'
+                            : 'Đã thêm vào yêu thích',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // Refresh button
+            GestureDetector(
+              onTap: _isRefreshing ? null : _refreshWeather,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _isRefreshing
+                      ? Colors.white.withOpacity(0.3)
+                      : Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: RotationTransition(
+                  turns: _rotationController,
+                  child: const Icon(
+                    Icons.refresh,
+                    color: Colors.white,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildForecastButton() {
+
+  Widget _buildForecastButton(Weather weather) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: BackdropFilter(
@@ -832,12 +642,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ForecastScreen(cityName: _weather!.cityName),
+                    builder: (_) => ForecastScreen(cityName: weather.cityName),
                   ),
                 );
               },
               borderRadius: BorderRadius.circular(18),
-              child: Padding(
+              child: const Padding(
                 padding: EdgeInsets.symmetric(vertical: 14),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -860,53 +670,5 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
     );
-  }
-
-  Widget _buildRefreshInfo() {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.access_time,
-                color: Colors.white70,
-                size: 14,
-              ),
-              SizedBox(width: 6),
-              Text(
-                _formatLastUpdate(),
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
-    final months = [
-      'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
-      'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12'
-    ];
-
-    return '${days[date.weekday % 7]}, ${date.day} ${months[date.month - 1]}';
   }
 }

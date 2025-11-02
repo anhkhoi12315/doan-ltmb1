@@ -1,7 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'weather_service.dart';
 import 'weather_model.dart';
+import 'package:intl/intl.dart';
 
 class ForecastScreen extends StatefulWidget {
   final String cityName;
@@ -12,16 +14,25 @@ class ForecastScreen extends StatefulWidget {
   State<ForecastScreen> createState() => _ForecastScreenState();
 }
 
-class _ForecastScreenState extends State<ForecastScreen> {
+class _ForecastScreenState extends State<ForecastScreen>
+    with SingleTickerProviderStateMixin {
   final WeatherService _weatherService = WeatherService();
   List<Weather> _forecasts = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this); // ← FIX: Initialize here
     _fetchForecast();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchForecast() async {
@@ -32,8 +43,6 @@ class _ForecastScreenState extends State<ForecastScreen> {
 
     try {
       final forecastData = await _weatherService.get5DayForecast(widget.cityName);
-
-      // Parse forecast data
       List<Weather> forecasts = [];
       final list = forecastData['list'] as List;
 
@@ -43,7 +52,7 @@ class _ForecastScreenState extends State<ForecastScreen> {
           'main': item['main'],
           'weather': item['weather'],
           'wind': item['wind'],
-          'visibility': item['visibility'],
+          'visibility': item['visibility'] ?? 10000,
           'dt': item['dt'],
         }));
       }
@@ -62,44 +71,10 @@ class _ForecastScreenState extends State<ForecastScreen> {
 
   Color _getGradientColor() {
     final hour = DateTime.now().hour;
-
     if (hour >= 18 || hour < 6) {
       return const Color(0xFF1a237e);
     }
-
     return const Color(0xFF4A90E2);
-  }
-
-  // Format date without intl package
-  String _formatDate(DateTime date) {
-    final days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
-    final day = days[date.weekday % 7];
-    return '$day ${date.day}/${date.month}';
-  }
-
-  // Format time without intl package
-  String _formatTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
-  }
-
-  // Get daily forecast (one per day)
-  List<Weather> _getDailyForecasts() {
-    Map<String, Weather> dailyMap = {};
-
-    for (var forecast in _forecasts) {
-      final dateKey = '${forecast.dateTime.year}-${forecast.dateTime.month.toString().padLeft(2, '0')}-${forecast.dateTime.day.toString().padLeft(2, '0')}';
-
-      // Take the noon forecast (12:00) or first of the day
-      if (!dailyMap.containsKey(dateKey)) {
-        dailyMap[dateKey] = forecast;
-      } else if (forecast.dateTime.hour == 12) {
-        dailyMap[dateKey] = forecast;
-      }
-    }
-
-    return dailyMap.values.toList();
   }
 
   @override
@@ -112,18 +87,303 @@ class _ForecastScreenState extends State<ForecastScreen> {
             end: Alignment.bottomRight,
             colors: [
               _getGradientColor(),
-              const Color(0xFF5B8FE3),
+              _getGradientColor().withBlue((_getGradientColor().blue + 50).clamp(0, 255)),
               const Color(0xFF9B59B6),
             ],
           ),
         ),
         child: SafeArea(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Colors.white))
-              : _errorMessage.isNotEmpty
-              ? _buildErrorWidget()
-              : _buildForecastContent(),
+          child: Column(
+            children: [
+              _buildHeader(),
+              if (!_isLoading && _errorMessage.isEmpty) _buildTabBar(), // ← FIX: Only show when loaded
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                    : _errorMessage.isNotEmpty
+                    ? _buildErrorWidget()
+                    : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildDailyForecast(),
+                    _buildHourlyForecast(),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.cityName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Text(
+                  'Dự báo thời tiết',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          color: Colors.white.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        labelColor: Colors.white,
+        unselectedLabelColor: Colors.white70,
+        dividerColor: Colors.transparent,
+        tabs: const [
+          Tab(text: '📅 Theo ngày'),
+          Tab(text: '⏰ Theo giờ'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDailyForecast() {
+    // Group forecasts by day
+    final dailyForecasts = <String, List<Weather>>{};
+    for (var forecast in _forecasts) {
+      final dateKey = DateFormat('yyyy-MM-dd').format(forecast.dateTime);
+      dailyForecasts.putIfAbsent(dateKey, () => []).add(forecast);
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: dailyForecasts.length,
+      itemBuilder: (context, index) {
+        final dateKey = dailyForecasts.keys.elementAt(index);
+        final dayForecasts = dailyForecasts[dateKey]!;
+
+        // Calculate stats
+        final temps = dayForecasts.map((f) => f.temperature).toList();
+        final maxTemp = temps.reduce((a, b) => a > b ? a : b);
+        final minTemp = temps.reduce((a, b) => a < b ? a : b);
+
+        // Get midday forecast for representative icon
+        final mainForecast = dayForecasts[dayForecasts.length ~/ 2];
+
+        return _buildDailyCard(
+          date: DateFormat('dd/MM/yyyy').format(mainForecast.dateTime),
+          dayName: _getDayName(mainForecast.dateTime),
+          icon: mainForecast.icon,
+          description: mainForecast.weatherStatusVN,
+          maxTemp: maxTemp,
+          minTemp: minTemp,
+        );
+      },
+    );
+  }
+
+  Widget _buildHourlyForecast() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemCount: _forecasts.length,
+      itemBuilder: (context, index) {
+        final forecast = _forecasts[index];
+        return _buildHourlyCard(forecast);
+      },
+    );
+  }
+
+  Widget _buildDailyCard({
+    required String date,
+    required String dayName,
+    required String icon,
+    required String description,
+    required double maxTemp,
+    required double minTemp,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Date
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  dayName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  date,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Icon & Description
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Image.network(
+                  _weatherService.getWeatherIconUrl(icon),
+                  width: 40,
+                  height: 40,
+                  errorBuilder: (context, error, stackTrace) => const Icon(
+                    Icons.cloud,
+                    color: Colors.white,
+                    size: 40,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    description,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Temperature
+          Text(
+            '${maxTemp.round()}° / ${minTemp.round()}°',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHourlyCard(Weather forecast) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Time
+          SizedBox(
+            width: 60,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  DateFormat('HH:mm').format(forecast.dateTime),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  DateFormat('dd/MM').format(forecast.dateTime),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Icon
+          Image.network(
+            _weatherService.getWeatherIconUrl(forecast.icon),
+            width: 50,
+            height: 50,
+            errorBuilder: (context, error, stackTrace) => const Icon(
+              Icons.cloud,
+              color: Colors.white,
+              size: 50,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Description
+          Expanded(
+            child: Text(
+              forecast.weatherStatusVN,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          // Temperature
+          Text(
+            '${forecast.temperature.round()}°',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -151,247 +411,22 @@ class _ForecastScreenState extends State<ForecastScreen> {
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: _fetchForecast,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white.withValues(alpha: 0.2),
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-            ),
-            child: const Text('Thử lại', style: TextStyle(color: Colors.white)),
+            child: const Text('Thử lại'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildForecastContent() {
-    final dailyForecasts = _getDailyForecasts();
+  String _getDayName(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final checkDate = DateTime(date.year, date.month, date.day);
 
-    return RefreshIndicator(
-      onRefresh: _fetchForecast,
-      color: Colors.blue,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 20),
-              _buildTitle(),
-              const SizedBox(height: 20),
-              _buildDailyForecasts(dailyForecasts),
-              const SizedBox(height: 24),
-              _buildHourlyTitle(),
-              const SizedBox(height: 16),
-              _buildHourlyForecasts(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    if (checkDate == today) return 'Hôm nay';
+    if (checkDate == today.add(const Duration(days: 1))) return 'Ngày mai';
 
-  Widget _buildHeader() {
-    return Row(
-      children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Dự báo thời tiết',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            Text(
-              widget.cityName,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTitle() {
-    return Text(
-      '7 ngày tới',
-      style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.9),
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _buildDailyForecasts(List<Weather> forecasts) {
-    return SizedBox(
-      height: 120,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: forecasts.length > 7 ? 7 : forecasts.length,
-        itemBuilder: (context, index) {
-          return _buildDailyCard(forecasts[index]);
-        },
-      ),
-    );
-  }
-
-  Widget _buildDailyCard(Weather forecast) {
-    return Container(
-      width: 90,
-      margin: const EdgeInsets.only(right: 12),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                Text(
-                  _formatDate(forecast.dateTime),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Image.network(
-                  _weatherService.getWeatherIconUrl(forecast.icon),
-                  width: 32,
-                  height: 32,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(Icons.cloud, color: Colors.white, size: 32);
-                  },
-                ),
-                Text(
-                  '${forecast.temperature.round()}°',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHourlyTitle() {
-    return Text(
-      'Theo giờ',
-      style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.9),
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-      ),
-    );
-  }
-
-  Widget _buildHourlyForecasts() {
-    // Get next 24 hours
-    final hourlyForecasts = _forecasts.length > 8
-        ? _forecasts.sublist(0, 8)
-        : _forecasts;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
-              width: 1.5,
-            ),
-          ),
-          child: Column(
-            children: hourlyForecasts.map((forecast) {
-              return _buildHourlyItem(forecast);
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHourlyItem(Weather forecast) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          SizedBox(
-            width: 60,
-            child: Text(
-              _formatTime(forecast.dateTime),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Image.network(
-                _weatherService.getWeatherIconUrl(forecast.icon),
-                width: 32,
-                height: 32,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(Icons.cloud, color: Colors.white, size: 32);
-                },
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 100,
-                child: Text(
-                  forecast.description,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 14,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          Text(
-            '${forecast.temperature.round()}°',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
+    const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    return days[date.weekday % 7];
   }
 }

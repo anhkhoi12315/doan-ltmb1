@@ -1,6 +1,7 @@
 name: weather_app
-description: A weather application with notifications
+description: Advanced Flutter weather application
 publish_to: 'none'
+
 version: 1.0.0+1
 
 environment:
@@ -10,17 +11,27 @@ dependencies:
   flutter:
     sdk: flutter
 
-  # HTTP requests
+  # HTTP & Networking
   http: ^1.1.0
+
+  # State Management
+  riverpod: ^2.4.0
+  flutter_riverpod: ^2.4.0
+
+  # Local Storage
+  shared_preferences: ^2.2.0
 
   # Notifications
   flutter_local_notifications: ^17.0.0
   timezone: ^0.9.2
 
-  # Date formatting
-  intl: ^0.18.1
-
   # UI
+  cached_network_image: ^3.3.0
+
+  # Date & Time
+  intl: ^0.19.0
+
+  # Icons
   cupertino_icons: ^1.0.2
 
 dev_dependencies:
