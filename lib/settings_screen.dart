@@ -142,7 +142,7 @@ class SettingsScreen extends ConsumerWidget {
                       applicationVersion: APP_VERSION,
                       applicationIcon: const Icon(Icons.cloud, size: 48),
                       children: [
-                        const Text('Ứng dụng thời tiết với Riverpod'),
+                        const Text('Ứng dụng thời tiết với KHOI'),
                         const Text('Developed with ❤️ in Vietnam'),
                       ],
                     );
