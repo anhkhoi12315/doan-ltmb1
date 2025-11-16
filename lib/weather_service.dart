@@ -11,7 +11,6 @@ class WeatherService {
   final CacheService _cacheService = CacheService();
   final http.Client _httpClient = http.Client();
 
-  /// Lấy thời tiết hiện tại (với cache)
   Future<Map<String, dynamic>> getCurrentWeather(String cityName) async {
     // Thử lấy từ cache trước
     final cached = await _cacheService.getWeatherCache(cityName);
